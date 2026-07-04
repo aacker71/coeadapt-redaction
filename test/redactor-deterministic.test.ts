@@ -41,6 +41,53 @@ describe('scrub — high severity (gov / financial)', () => {
     expect(scrub('ssn 123-45-6789').redacted).toBe('ssn <SSN>');
     expect(scrub('card 4111111111111111').redacted).toBe('card <CC>');
   });
+
+  it('redacts cards written with spaces or dashes', () => {
+    expect(scrub('card 4111 1111 1111 1111 on file').redacted).toBe('card <CC> on file');
+    expect(scrub('card 4111-1111-1111-1111 on file').redacted).toBe('card <CC> on file');
+  });
+
+  it('does not treat a 10-digit phone-length run as a card', () => {
+    expect(scrub('ref 4155550199', { minSeverity: 'high' }).redacted).toBe('ref 4155550199');
+  });
+
+  it('redacts a full DOB in slash or dash form', () => {
+    expect(scrub('born 04/12/1988 in Boston').redacted).toBe('born <DOB> in Boston');
+    expect(scrub('DOB: 4-12-1988').redacted).toBe('DOB: <DOB>');
+  });
+
+  it('leaves ISO dates alone (year-first)', () => {
+    expect(scrub('deployed 2026-07-04', { minSeverity: 'high' }).redacted).toBe(
+      'deployed 2026-07-04',
+    );
+  });
+
+  it('redacts keyword-anchored passport numbers', () => {
+    expect(scrub('my passport no: X1234567 expires soon').redacted).toBe('my <PASSPORT> expires soon');
+    expect(scrub('Passport number AB123456').redacted).toBe('<PASSPORT>');
+  });
+
+  it('redacts keyword-anchored routing / account numbers', () => {
+    expect(scrub('routing number 021000021').redacted).toBe('<ACCOUNT_NUMBER>');
+    expect(scrub('account #: 123456789012').redacted).toBe('<ACCOUNT_NUMBER>');
+  });
+
+  it('prefers the specific account placeholder over the card fallback', () => {
+    expect(scrub('account number 4111111111111111').redacted).toBe('<ACCOUNT_NUMBER>');
+  });
+
+  it('detects a separator-less 9-digit SSN but never rewrites it (detectOnly)', () => {
+    expect(containsPii('ssn is 123456789', { minSeverity: 'high' })).toBe(true);
+    // scrub must NOT mask bare 9-digit runs — too false-positive-prone
+    // (build numbers, order ids) to rewrite egress text with.
+    expect(scrub('build 123456789 shipped').redacted).toBe('build 123456789 shipped');
+  });
+
+  it('does not flag innocuous engineering numbers at high severity', () => {
+    expect(containsPii('we shipped 42 PRs and reduced p99 by 18ms', { minSeverity: 'high' })).toBe(
+      false,
+    );
+  });
 });
 
 describe('scrub — medium / low (contact + network)', () => {

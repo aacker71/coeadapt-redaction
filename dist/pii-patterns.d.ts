@@ -15,6 +15,10 @@
  *   - 'medium':   redacted by default but acceptable in some contexts
  *                 (emails, phone numbers, file paths, hostnames)
  *   - 'low':      replaceable with a class placeholder (URLs, IP addresses)
+ *
+ * A pattern may additionally be `detectOnly`: it participates in
+ * containsPii / SENSITIVITY_HINTS but is never applied by scrub(). Use this
+ * for shapes too ambiguous to rewrite text with (e.g. a bare 9-digit run).
  */
 export type PiiSeverity = 'critical' | 'high' | 'medium' | 'low';
 export interface PiiPattern {
@@ -26,6 +30,13 @@ export interface PiiPattern {
     readonly placeholder: string;
     /** Trust tier — see file header. */
     readonly severity: PiiSeverity;
+    /**
+     * Detection-only: counts for `containsPii` / SENSITIVITY_HINTS escalation
+     * but is skipped by `scrub`. For patterns too false-positive-prone to
+     * rewrite text with (escalating sensitivity on a false positive is cheap;
+     * masking a build number as <SSN> on an egress path is not).
+     */
+    readonly detectOnly?: boolean;
 }
 /** Numeric rank for severity thresholding (higher = more sensitive). */
 export declare const SEVERITY_RANK: Record<PiiSeverity, number>;

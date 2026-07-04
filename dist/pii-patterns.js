@@ -15,6 +15,10 @@
  *   - 'medium':   redacted by default but acceptable in some contexts
  *                 (emails, phone numbers, file paths, hostnames)
  *   - 'low':      replaceable with a class placeholder (URLs, IP addresses)
+ *
+ * A pattern may additionally be `detectOnly`: it participates in
+ * containsPii / SENSITIVITY_HINTS but is never applied by scrub(). Use this
+ * for shapes too ambiguous to rewrite text with (e.g. a bare 9-digit run).
  */
 /** Numeric rank for severity thresholding (higher = more sensitive). */
 export const SEVERITY_RANK = {
@@ -88,13 +92,54 @@ const US_SSN = {
     severity: 'high',
 };
 const CREDIT_CARD_LIKE = {
-    // Heuristic: 13-19 digits in a contiguous run. Loose by design — false
-    // positives (long order numbers, etc.) are acceptable since over-redaction
-    // is safe on every egress path this firewall guards.
+    // Heuristic: 13-19 digits with optional single space/dash separators
+    // BETWEEN digits, so "4111 1111 1111 1111" and "4111-1111-1111-1111" match
+    // as well as the contiguous run (and the match never swallows a trailing
+    // separator). Loose by design — false positives (long order numbers, etc.)
+    // are acceptable since over-redaction is safe on every egress path this
+    // firewall guards. No Luhn check: a card with one mistyped digit should
+    // still be caught.
     name: 'credit-card-like',
-    regex: /\b\d{13,19}\b/g,
+    regex: /\b\d(?:[ -]?\d){12,18}\b/g,
     placeholder: '<CC>',
     severity: 'high',
+};
+const FULL_DOB = {
+    // d/m or m/d plus a 19xx/20xx year, slash- or dash-separated. Matches any
+    // date in that shape, not just birth dates — acceptable over-redaction.
+    // ISO dates (2026-07-04) are year-first and do NOT match.
+    name: 'full-dob',
+    regex: /\b\d{1,2}[/-]\d{1,2}[/-](?:19|20)\d{2}\b/g,
+    placeholder: '<DOB>',
+    severity: 'high',
+};
+const PASSPORT_NUMBER = {
+    // Keyword-anchored: "passport", optional "no."/"number", then a 6+ char
+    // alphanumeric id. Replaces the whole span, keyword included.
+    name: 'passport-number',
+    regex: /\bpassport(?:\s+no\.?|\s+number)?\s*[:#]?\s*[A-Z0-9]{6,}\b/gi,
+    placeholder: '<PASSPORT>',
+    severity: 'high',
+};
+const ROUTING_OR_ACCOUNT_NUMBER = {
+    // Keyword-anchored bank identifiers. Runs before CREDIT_CARD_LIKE and
+    // US_SSN_NO_SEPARATOR in the registry so "account number 4111111111111111"
+    // and "routing number 021000021" get the specific placeholder, not <CC>.
+    name: 'routing-or-account-number',
+    regex: /\b(?:routing|account)\s*(?:no\.?|number)?[\s:#]*\d{6,}\b/gi,
+    placeholder: '<ACCOUNT_NUMBER>',
+    severity: 'high',
+};
+const US_SSN_NO_SEPARATOR = {
+    // An SSN written without separators is indistinguishable from any other
+    // 9-digit number (order ids, issue numbers, routing numbers), so this is
+    // detectOnly: it escalates sensitivity via containsPii/SENSITIVITY_HINTS
+    // but scrub() never rewrites the text with it.
+    name: 'us-ssn-no-separator',
+    regex: /\b\d{9}\b/g,
+    placeholder: '<SSN>',
+    severity: 'high',
+    detectOnly: true,
 };
 const EMAIL_PASSWORD_PROXIMITY = {
     // Email followed within ~80 chars by password/passwd/pwd — strong signal
@@ -169,7 +214,9 @@ const URL = {
 //
 // Run 'critical' patterns first so credentials are masked before the generic
 // API-key fallback fires. EMAIL_PASSWORD_PROXIMITY runs before EMAIL so the
-// stronger compound match wins.
+// stronger compound match wins. Keyword-anchored financial patterns
+// (PASSPORT_NUMBER, ROUTING_OR_ACCOUNT_NUMBER) run before the loose digit-run
+// patterns (CREDIT_CARD_LIKE, US_SSN_NO_SEPARATOR) for the same reason.
 // ---------------------------------------------------------------------------
 export const PII_PATTERNS = [
     PEM_KEY,
@@ -182,7 +229,11 @@ export const PII_PATTERNS = [
     GENERIC_API_KEY,
     US_SSN,
     EMAIL_PASSWORD_PROXIMITY,
+    PASSPORT_NUMBER,
+    ROUTING_OR_ACCOUNT_NUMBER,
     CREDIT_CARD_LIKE,
+    FULL_DOB,
+    US_SSN_NO_SEPARATOR,
     EMAIL,
     US_PHONE,
     WINDOWS_PATH,

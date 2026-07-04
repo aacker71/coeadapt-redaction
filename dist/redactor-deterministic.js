@@ -26,6 +26,10 @@ export function scrub(rawText, opts = {}) {
     for (const pattern of PII_PATTERNS) {
         if (SEVERITY_RANK[pattern.severity] < threshold)
             continue;
+        // detectOnly patterns escalate sensitivity (containsPii) but are too
+        // false-positive-prone to rewrite text with.
+        if (pattern.detectOnly)
+            continue;
         // Reset lastIndex between inputs — defensive; every pattern uses /g.
         pattern.regex.lastIndex = 0;
         let match;
