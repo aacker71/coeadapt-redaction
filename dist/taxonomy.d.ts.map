@@ -1,0 +1,1 @@
+{"version":3,"file":"taxonomy.d.ts","sourceRoot":"","sources":["../src/taxonomy.ts"],"names":[],"mappings":"AAAA;;;;;;;;;;GAUG;AAEH,MAAM,WAAW,YAAY;IAC3B,OAAO,EAAE,MAAM,CAAC;IAChB,UAAU,EAAE,MAAM,CAAC,MAAM,EAAE,MAAM,CAAC,MAAM,EAAE,MAAM,CAAC,CAAC,CAAC;CACpD;AAED,eAAO,MAAM,aAAa,EAAE,YA8D3B,CAAC"}

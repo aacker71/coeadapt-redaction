@@ -1,0 +1,34 @@
+name: publish
+
+# Publishes @coeadapt/redaction to GitHub Packages on a version tag (v1.2.3).
+# Consumers (Coeadapt2, career-box-dev) install it from npm.pkg.github.com with a
+# GITHUB_TOKEN that has read:packages — including the Coeadapt2 AppRunner Docker build.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@coeadapt'
+
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+
+      - run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
