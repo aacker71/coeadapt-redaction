@@ -2,9 +2,15 @@
  * Shared PII regex library.
  *
  * Single source of truth for the deterministic redactor (redactor-deterministic)
- * and the field-level firewall (redact-fields). Mirrored — by hand, under a
- * parity test — by `career-box-dev/local_runtime/redaction.py` (Python cannot
- * import this package).
+ * and the field-level firewall (redact-fields). Mirrored by hand by
+ * `career-box-dev/local_runtime/redaction.py` (Python cannot import this
+ * package); agreement is enforced by the shared parity corpus at
+ * `career-box-dev/evals/redaction-parity/` (75 adversarial fixtures, run in
+ * that repo's CI — measured 2026-07-13: 41/46 critical-class neutralizations
+ * on BOTH sides with this commit's patterns, zero TS<->Python disagreements;
+ * the 5 remaining misses are documented regex-layer limits in PARITY.md:
+ * spaced/base64/chunk-split keys and non-US national ids). Update the corpus
+ * when changing any regex here.
  *
  * Patterns MUST be module-level constants so they are compiled exactly once per
  * process. Calling `new RegExp(...)` per event would dominate the hot path.
@@ -60,6 +66,18 @@ const PEM_KEY: PiiPattern = {
   severity: 'critical',
 };
 
+const PEM_KEY_UNTERMINATED: PiiPattern = {
+  // A PEM header whose END marker is missing — a key split at a capture/chunk
+  // boundary. Runs AFTER PEM_KEY (which consumes terminated blocks) and eats
+  // the header plus any following base64-looking lines (20+ chars of base64
+  // alphabet) so the key body cannot leak. Parity fix 2026-07-13: this shape
+  // previously passed through scrub() untouched.
+  name: 'pem-private-key-unterminated',
+  regex: /-----BEGIN [A-Z ]*PRIVATE KEY-----\s*(?:[A-Za-z0-9+/=]{20,}\s*)*/g,
+  placeholder: '<PEM_KEY>',
+  severity: 'critical',
+};
+
 const ANTHROPIC_API_KEY: PiiPattern = {
   name: 'anthropic-api-key',
   regex: /\bsk-ant-[A-Za-z0-9_-]{16,}\b/g,
@@ -98,6 +116,23 @@ const AWS_ACCESS_KEY: PiiPattern = {
   severity: 'critical',
 };
 
+const AWS_SECRET_ACCESS_KEY: PiiPattern = {
+  // aws_secret_access_key = <40ish chars>. Parity fix 2026-07-13 (the Python
+  // prefilter already blocked this shape; scrub() leaked it).
+  name: 'aws-secret-access-key',
+  regex: /\baws_secret_access_key\b\s*[=:]\s*\S{20,}/gi,
+  placeholder: '<AWS_SECRET_KEY>',
+  severity: 'critical',
+};
+
+const SLACK_TOKEN: PiiPattern = {
+  // xoxb-/xoxa-/xoxp-/xoxr-/xoxs- Slack tokens. Parity fix 2026-07-13.
+  name: 'slack-token',
+  regex: /\bxox[baprs]-[A-Za-z0-9-]{10,}\b/g,
+  placeholder: '<SLACK_TOKEN>',
+  severity: 'critical',
+};
+
 const BEARER_TOKEN: PiiPattern = {
   name: 'bearer-token',
   regex: /Bearer\s+[A-Za-z0-9._-]{20,}/gi,
@@ -113,27 +148,72 @@ const JWT_TOKEN: PiiPattern = {
   severity: 'critical',
 };
 
+const UNDERSCORE_SECRET_KEY: PiiPattern = {
+  // Stripe-style underscore-separated keys: sk_live_/sk_test_/pk_live_/
+  // rk_test_ etc. The dash-only GENERIC_API_KEY missed these entirely — the
+  // exact shape of the 2026-07 leaked prod secrets. Parity fix 2026-07-13.
+  name: 'underscore-secret-key',
+  regex: /\b(?:sk|pk|rk)_(?:live|test)_[A-Za-z0-9]{10,}\b/g,
+  placeholder: '<API_KEY>',
+  severity: 'critical',
+};
+
+const URL_CREDENTIALS: PiiPattern = {
+  // user:password@ inside any scheme://... URL (postgres://, mongodb+srv://,
+  // redis://, https:// basic auth). Before this pattern the password only
+  // vanished when it happened to look like an email local part — a password
+  // containing '!' leaked. Parity fix 2026-07-13.
+  name: 'url-credentials',
+  regex: /(?<=:\/\/)[^\s:/@]{1,64}:[^\s@]{1,256}@/g,
+  placeholder: '<URL_CREDENTIALS>@',
+  severity: 'critical',
+};
+
+const ENV_SECRET_ASSIGNMENT: PiiPattern = {
+  // UPPER_SNAKE_CASE secret-ish var assigned a value (DATABASE_PASSWORD=...,
+  // JWT_SECRET: ...), anywhere in the text, not just .env column 0.
+  // Parity fix 2026-07-13.
+  name: 'env-secret-assignment',
+  regex: /\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*_(?:KEY|SECRET|TOKEN|PASSWORD|PWD|APIKEY)\b\s*[=:]\s*\S{4,}/g,
+  placeholder: '<ENV_SECRET>',
+  severity: 'critical',
+};
+
+const SECRET_ASSIGNMENT: PiiPattern = {
+  // keyword [=:] value — password: hunter2, api_key: ..., auth_token=... .
+  // MUST run before EMAIL_PASSWORD_PROXIMITY: the proximity match ends at the
+  // keyword, so if it ran first the password VALUE itself would survive.
+  // Parity fix 2026-07-13.
+  name: 'secret-assignment',
+  regex: /\b(?:api[_-]?key|secret|client[_-]?secret|access[_-]?token|auth[_-]?token|password|passwd|pwd)\b\s*[=:]\s*['"]?[^\s'"]{8,}/gi,
+  placeholder: '<SECRET_ASSIGNMENT>',
+  severity: 'critical',
+};
+
 // ---------------------------------------------------------------------------
 // High — government / financial identifiers
 // ---------------------------------------------------------------------------
 
 const US_SSN: PiiPattern = {
+  // Dash- or space-separated (078-05-1120 / 078 05 1120). The spaced form
+  // previously leaked raw — parity fix 2026-07-13.
   name: 'us-ssn',
-  regex: /\b\d{3}-\d{2}-\d{4}\b/g,
+  regex: /\b\d{3}[- ]\d{2}[- ]\d{4}\b/g,
   placeholder: '<SSN>',
   severity: 'high',
 };
 
 const CREDIT_CARD_LIKE: PiiPattern = {
-  // Heuristic: 13-19 digits with optional single space/dash separators
-  // BETWEEN digits, so "4111 1111 1111 1111" and "4111-1111-1111-1111" match
-  // as well as the contiguous run (and the match never swallows a trailing
-  // separator). Loose by design — false positives (long order numbers, etc.)
-  // are acceptable since over-redaction is safe on every egress path this
-  // firewall guards. No Luhn check: a card with one mistyped digit should
-  // still be caught.
+  // Heuristic: 13-19 digits with optional single space/dash/dot separators
+  // BETWEEN digits, so "4111 1111 1111 1111", "4111-1111-1111-1111" and
+  // "4111.1111.1111.1111" match as well as the contiguous run (and the match
+  // never swallows a trailing separator). Loose by design — false positives
+  // (long order numbers, etc.) are acceptable since over-redaction is safe on
+  // every egress path this firewall guards. No Luhn check: a card with one
+  // mistyped digit should still be caught. Dot tolerance added in the
+  // 2026-07-13 parity fix (dotted cards previously leaked raw).
   name: 'credit-card-like',
-  regex: /\b\d(?:[ -]?\d){12,18}\b/g,
+  regex: /\b\d(?:[ .-]?\d){12,18}\b/g,
   placeholder: '<CC>',
   severity: 'high',
 };
@@ -193,8 +273,11 @@ const EMAIL_PASSWORD_PROXIMITY: PiiPattern = {
 // ---------------------------------------------------------------------------
 
 const EMAIL: PiiPattern = {
+  // Local part is unicode-aware (\p{L}\p{N}): a homoglyph address like
+  // jоhn.dоe@… (Cyrillic о) previously only lost its ASCII tail, leaking the
+  // name fragment. Parity fix 2026-07-13.
   name: 'email',
-  regex: /\b[\w.+-]+@[\w-]+\.[\w.-]+\b/g,
+  regex: /[\p{L}\p{N}._%+-]+@[\w-]+\.[\w.-]+\b/gu,
   placeholder: '<EMAIL>',
   severity: 'medium',
 };
@@ -270,13 +353,21 @@ const URL: PiiPattern = {
 
 export const PII_PATTERNS: ReadonlyArray<PiiPattern> = [
   PEM_KEY,
+  PEM_KEY_UNTERMINATED,
   ANTHROPIC_API_KEY,
   OPENAI_API_KEY,
   GITHUB_TOKEN,
   AWS_ACCESS_KEY,
+  AWS_SECRET_ACCESS_KEY,
+  SLACK_TOKEN,
   BEARER_TOKEN,
   JWT_TOKEN,
   GENERIC_API_KEY,
+  UNDERSCORE_SECRET_KEY,
+  URL_CREDENTIALS,
+  ENV_SECRET_ASSIGNMENT,
+  // SECRET_ASSIGNMENT must precede EMAIL_PASSWORD_PROXIMITY — see its comment.
+  SECRET_ASSIGNMENT,
   US_SSN,
   EMAIL_PASSWORD_PROXIMITY,
   PASSPORT_NUMBER,

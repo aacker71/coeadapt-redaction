@@ -139,6 +139,79 @@ describe('scrub — invariants', () => {
   });
 });
 
+describe('scrub — 2026-07-13 parity-corpus fixes (career-box-dev/evals/redaction-parity)', () => {
+  it('blocks an unterminated PEM block split at a chunk boundary', () => {
+    const { redacted } = scrub('log tail: -----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQE');
+    expect(redacted).not.toContain('MIIEvQ');
+    expect(redacted).toContain('log tail:');
+  });
+
+  it('still prefers the terminated PEM pattern for a full block', () => {
+    const pem = '-----BEGIN EC PRIVATE KEY-----\nMIIabc\n-----END EC PRIVATE KEY-----';
+    const { replacements } = scrub(pem);
+    expect(replacements[0].pattern).toBe('pem-private-key');
+  });
+
+  it('redacts Stripe-style underscore keys (sk_live_/pk_test_)', () => {
+    expect(scrub('via sk_live_51HxYzAbCdEfGh123456 ok').redacted).toBe('via <API_KEY> ok');
+    expect(scrub('pk_test_AbCdEfGh12345678 in checkout.js').redacted).toContain('<API_KEY>');
+  });
+
+  it('redacts Slack tokens', () => {
+    expect(scrub('bot xoxb-123456789012-AbCdEfGhIjKl deployed').redacted).toBe(
+      'bot <SLACK_TOKEN> deployed',
+    );
+  });
+
+  it('redacts aws_secret_access_key assignments', () => {
+    const { redacted } = scrub('aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY');
+    expect(redacted).not.toContain('wJalrX');
+    expect(redacted).toContain('<AWS_SECRET_KEY>');
+  });
+
+  it('redacts credentials embedded in connection strings, whatever the password looks like', () => {
+    // Passwords that do NOT parse as an email local part used to leak.
+    const { redacted } = scrub('redis://cache:s3cret!pw@redis.prod.internal:6379 flushed');
+    expect(redacted).not.toContain('s3cret');
+    expect(redacted).toContain('<URL_CREDENTIALS>@');
+    expect(redacted).toContain('flushed');
+    expect(scrub('postgres://admin:hunter2@db.internal.acme.com:5432/app').redacted).not.toContain(
+      'hunter2',
+    );
+  });
+
+  it('redacts UPPER_SNAKE env secret assignments but not config names', () => {
+    const { redacted } = scrub('APP_ENV=production\nJWT_SECRET=correct-horse-battery-staple');
+    expect(redacted).not.toContain('correct-horse');
+    expect(redacted).toContain('APP_ENV=production');
+    expect(scrub('set PASSWORD_MIN_LENGTH=12 and retry').redacted).toBe(
+      'set PASSWORD_MIN_LENGTH=12 and retry',
+    );
+  });
+
+  it('redacts the password VALUE in an email+password dump, not just the keyword', () => {
+    // EMAIL_PASSWORD_PROXIMITY ends its match at the keyword; before the
+    // secret-assignment pattern ran first, the value itself survived.
+    const { redacted } = scrub('login jane@corp.example.com password: hunter22now');
+    expect(redacted).not.toContain('hunter22now');
+    expect(redacted).not.toContain('jane@corp.example.com');
+  });
+
+  it('redacts space-separated SSNs and dotted card numbers', () => {
+    expect(scrub('SSN 078 05 1120 per HR').redacted).toBe('SSN <SSN> per HR');
+    expect(scrub('card 4111.1111.1111.1111 on file').redacted).toBe('card <CC> on file');
+  });
+
+  it('removes a homoglyph email whole, not just its ASCII tail', () => {
+    const { redacted } = scrub('contact jоhn.dоe@corp.example.com now'); // Cyrillic о
+    expect(redacted).toBe('contact <EMAIL> now');
+  });
+
+  it('keyword-anchored account numbers still beat the card matcher', () => {
+    expect(scrub('account #: 4111111111111111 debited').redacted).toBe('<ACCOUNT_NUMBER> debited');
+  });
+});
+
 describe('containsPii', () => {
   it('detects at threshold and respects minSeverity', () => {
     expect(containsPii('me@example.com')).toBe(true);

@@ -2,9 +2,15 @@
  * Shared PII regex library.
  *
  * Single source of truth for the deterministic redactor (redactor-deterministic)
- * and the field-level firewall (redact-fields). Mirrored — by hand, under a
- * parity test — by `career-box-dev/local_runtime/redaction.py` (Python cannot
- * import this package).
+ * and the field-level firewall (redact-fields). Mirrored by hand by
+ * `career-box-dev/local_runtime/redaction.py` (Python cannot import this
+ * package); agreement is enforced by the shared parity corpus at
+ * `career-box-dev/evals/redaction-parity/` (75 adversarial fixtures, run in
+ * that repo's CI — measured 2026-07-13: 41/46 critical-class neutralizations
+ * on BOTH sides with this commit's patterns, zero TS<->Python disagreements;
+ * the 5 remaining misses are documented regex-layer limits in PARITY.md:
+ * spaced/base64/chunk-split keys and non-US national ids). Update the corpus
+ * when changing any regex here.
  *
  * Patterns MUST be module-level constants so they are compiled exactly once per
  * process. Calling `new RegExp(...)` per event would dominate the hot path.

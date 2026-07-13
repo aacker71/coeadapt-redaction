@@ -1,6 +1,6 @@
 {
   "name": "@coeadapt/redaction",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Shared PII redaction firewall for the Coeadapt portfolio pipeline. Single source of truth for the producer (career-box-dev) and consumer (Coeadapt2) egress paths.",
   "license": "UNLICENSED",
   "private": false,
