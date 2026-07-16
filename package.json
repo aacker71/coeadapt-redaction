@@ -23,6 +23,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:recall": "vitest run test/recall-gate.test.ts",
+    "recall:baseline": "RECALL_UPDATE_BASELINE=1 vitest run test/recall-gate.test.ts",
     "prepublishOnly": "npm run build"
   },
   "repository": {

@@ -1,0 +1,123 @@
+{
+  "description": "Committed per-category recall baseline for the B8 adversarial corpus. The gate in test/recall-gate.test.ts fails if measured recall drops below these numbers. Regenerate ONLY on intentional corpus/pattern changes: npm run recall:baseline",
+  "generatedAt": "2026-07-16",
+  "overall": {
+    "total": 80,
+    "caught": 60,
+    "recall": 0.75
+  },
+  "categories": {
+    "code-comments": {
+      "total": 6,
+      "caught": 6,
+      "recall": 1,
+      "misses": []
+    },
+    "commit-messages": {
+      "total": 6,
+      "caught": 6,
+      "recall": 1,
+      "misses": []
+    },
+    "credentials-in-context": {
+      "total": 7,
+      "caught": 5,
+      "recall": 0.7143,
+      "misses": [
+        "yaml-bare-secret-access-key",
+        "cli-inline-password-flag"
+      ]
+    },
+    "env-lines": {
+      "total": 7,
+      "caught": 7,
+      "recall": 1,
+      "misses": []
+    },
+    "gov-financial": {
+      "total": 6,
+      "caught": 6,
+      "recall": 1,
+      "misses": []
+    },
+    "intl-formats": {
+      "total": 6,
+      "caught": 2,
+      "recall": 0.3333,
+      "misses": [
+        "phone-uk-grouping",
+        "phone-e164-no-separator",
+        "uk-nino",
+        "dob-eu-dotted"
+      ]
+    },
+    "json-blobs": {
+      "total": 6,
+      "caught": 5,
+      "recall": 0.8333,
+      "misses": [
+        "json-quoted-password"
+      ]
+    },
+    "markdown-tables": {
+      "total": 5,
+      "caught": 4,
+      "recall": 0.8,
+      "misses": [
+        "table-account-split-cell"
+      ]
+    },
+    "mixed-separators": {
+      "total": 6,
+      "caught": 4,
+      "recall": 0.6667,
+      "misses": [
+        "card-double-space",
+        "phone-parens-no-space"
+      ]
+    },
+    "readme-badges-urls": {
+      "total": 6,
+      "caught": 6,
+      "recall": 1,
+      "misses": []
+    },
+    "semantic-taxonomy": {
+      "total": 4,
+      "caught": 4,
+      "recall": 1,
+      "misses": []
+    },
+    "split-across-lines": {
+      "total": 5,
+      "caught": 1,
+      "recall": 0.2,
+      "misses": [
+        "card-split-across-newline",
+        "ssn-split-across-newline",
+        "email-split-across-newline",
+        "jwt-split-across-newline"
+      ]
+    },
+    "ssn-bare-9digit": {
+      "total": 4,
+      "caught": 3,
+      "recall": 0.75,
+      "misses": [
+        "bare-ssn-scrub-by-design"
+      ]
+    },
+    "unicode-homoglyph": {
+      "total": 6,
+      "caught": 1,
+      "recall": 0.1667,
+      "misses": [
+        "fullwidth-digits-ssn",
+        "zwsp-inside-card",
+        "nbsp-separated-card",
+        "cyrillic-domain-email",
+        "homoglyph-inside-api-key"
+      ]
+    }
+  }
+}

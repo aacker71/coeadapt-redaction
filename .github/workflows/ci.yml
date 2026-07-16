@@ -1,0 +1,26 @@
+name: ci
+
+# Test gate for every push/PR: typecheck + full vitest suite, which includes
+# the B8 adversarial PII recall gate (test/recall-gate.test.ts ratcheting
+# per-category recall against eval/recall-baseline.json). The B7 TS<->Python
+# parity corpus runs separately in career-box-dev's CI.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
