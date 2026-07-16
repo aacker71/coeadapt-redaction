@@ -1,0 +1,1123 @@
+{
+  "version": 1,
+  "description": "B8 adversarial PII recall corpus. Measures the RECALL of this library itself (scrub / containsPii / scrubSemantic) on PII hidden in the shapes real repos and activity streams produce. DISTINCT from the B7 TS<->Python parity corpus at career-box-dev/evals/redaction-parity/ (75 fixtures, cross-language agreement) — that corpus asks 'do both implementations agree', this one asks 'does the library catch it at all'. Consumed by test/recall-gate.test.ts, which ratchets per-category recall against eval/recall-baseline.json. Fixtures with expected='miss' are xfail-style documentation of current gaps: the gate asserts they STILL miss, so a pattern fix flips them visibly (promote to 'caught' + regenerate the baseline). NEVER delete or weaken a fixture to make the suite pass; NEVER silently skip a gap — document it. Pattern fixes are follow-up PRs gated by this corpus.",
+  "modes": {
+    "scrub": "caught iff no planted value (nor mustNotSurvive fragment) survives in scrub(input).redacted at default (low) threshold",
+    "detect": "caught iff containsPii(input, { minSeverity: 'high' }) is true — for detectOnly patterns that escalate sensitivity but never rewrite text",
+    "semantic": "caught iff no planted term survives in scrubSemantic(input).redacted"
+  },
+  "fixtures": [
+    {
+      "id": "readme-badge-email-query",
+      "category": "readme-badges-urls",
+      "mode": "scrub",
+      "input": "![build](https://img.shields.io/badge/contact-blue?email=dev@corp.example.com) CI status",
+      "planted": [
+        {
+          "type": "email",
+          "value": "dev@corp.example.com"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "readme-clone-token",
+      "category": "readme-badges-urls",
+      "mode": "scrub",
+      "input": "git clone https://x-access-token:ghp_AbCdEfGhIjKlMnOpQrStUvWxYz0123456789@github.com/acme/private-repo.git",
+      "planted": [
+        {
+          "type": "github_token",
+          "value": "ghp_AbCdEfGhIjKlMnOpQrStUvWxYz0123456789"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "readme-mailto",
+      "category": "readme-badges-urls",
+      "mode": "scrub",
+      "input": "Questions? [Email the maintainer](mailto:jane.doe@corp.example.com) or open an issue.",
+      "planted": [
+        {
+          "type": "email",
+          "value": "jane.doe@corp.example.com"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "readme-support-email",
+      "category": "readme-badges-urls",
+      "mode": "scrub",
+      "input": "## Support\n\nReach the team at support-team@corp.example.com (business hours only).",
+      "planted": [
+        {
+          "type": "email",
+          "value": "support-team@corp.example.com"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "readme-badge-username-query",
+      "category": "readme-badges-urls",
+      "mode": "scrub",
+      "input": "[![Gitter](https://badges.gitter.im/acme/community.svg)](https://gitter.im/acme?user=alexrivera91)",
+      "planted": [
+        {
+          "type": "username",
+          "value": "alexrivera91"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "readme-demo-creds",
+      "category": "readme-badges-urls",
+      "mode": "scrub",
+      "input": "Demo login: demo@corp.example.com / password: Tr0ub4dor3xk (staging only)",
+      "planted": [
+        {
+          "type": "email",
+          "value": "demo@corp.example.com"
+        },
+        {
+          "type": "password",
+          "value": "Tr0ub4dor3xk"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "commit-signed-off",
+      "category": "commit-messages",
+      "mode": "scrub",
+      "input": "fix(auth): tighten session TTL\n\nSigned-off-by: Jane Doe <jane.doe@corp.example.com>",
+      "planted": [
+        {
+          "type": "email",
+          "value": "jane.doe@corp.example.com"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "commit-coauthor",
+      "category": "commit-messages",
+      "mode": "scrub",
+      "input": "feat: retry queue drain\n\nCo-Authored-By: Alex Rivera <alex.rivera@corp.example.com>",
+      "planted": [
+        {
+          "type": "email",
+          "value": "alex.rivera@corp.example.com"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "commit-leaked-stripe-key",
+      "category": "commit-messages",
+      "mode": "scrub",
+      "input": "chore: rotate leaked key sk_live_51HxYzAbCdEfGh998877 before deploy",
+      "planted": [
+        {
+          "type": "api_key",
+          "value": "sk_live_51HxYzAbCdEfGh998877"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "commit-aws-key",
+      "category": "commit-messages",
+      "mode": "scrub",
+      "input": "revert: config included AKIAIOSFODNN7EXAMPLE by mistake",
+      "planted": [
+        {
+          "type": "aws_key",
+          "value": "AKIAIOSFODNN7EXAMPLE"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "commit-oncall-phone",
+      "category": "commit-messages",
+      "mode": "scrub",
+      "input": "docs: on-call runbook — page Bob at 415-555-0142 if the queue backs up",
+      "planted": [
+        {
+          "type": "phone",
+          "value": "415-555-0142"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "commit-internal-hostname",
+      "category": "commit-messages",
+      "mode": "scrub",
+      "input": "deploy: point workers at prod-db.internal.acme.com",
+      "planted": [
+        {
+          "type": "hostname",
+          "value": "prod-db.internal.acme.com"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "env-database-url-creds",
+      "category": "env-lines",
+      "mode": "scrub",
+      "input": "DATABASE_URL=postgres://admin:hunter2pass@db.internal.acme.com:5432/app",
+      "planted": [
+        {
+          "type": "credentials_in_url",
+          "value": "hunter2pass"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "env-stripe-secret",
+      "category": "env-lines",
+      "mode": "scrub",
+      "input": "STRIPE_SECRET_KEY=sk_live_51AbCdEfGh12345678",
+      "planted": [
+        {
+          "type": "api_key",
+          "value": "sk_live_51AbCdEfGh12345678"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "env-export-quoted-openai",
+      "category": "env-lines",
+      "mode": "scrub",
+      "input": "export OPENAI_API_KEY=\"sk-proj-AbCdEf1234567890GhIjKl\"",
+      "planted": [
+        {
+          "type": "api_key",
+          "value": "sk-proj-AbCdEf1234567890GhIjKl"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "env-yaml-smtp-password",
+      "category": "env-lines",
+      "mode": "scrub",
+      "input": "smtp:\n  host: mail.acme.internal\n  password: S3cretMailPass99",
+      "planted": [
+        {
+          "type": "secret_assignment",
+          "value": "S3cretMailPass99"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "env-aws-secret-line",
+      "category": "env-lines",
+      "mode": "scrub",
+      "input": "AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+      "planted": [
+        {
+          "type": "aws_secret",
+          "value": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "env-slack-bot-token",
+      "category": "env-lines",
+      "mode": "scrub",
+      "input": "SLACK_BOT_TOKEN=xoxb-FAKEFAKEFAKE-AbCdEfGhIjKlMnOp",
+      "planted": [
+        {
+          "type": "slack_token",
+          "value": "xoxb-FAKEFAKEFAKE-AbCdEfGhIjKlMnOp"
+        }
+      ],
+      "expected": "caught",
+      "notes": "Token body is letters-only so GitHub push protection does not mistake it for a live Slack token; still matches the slack-token pattern (xox[baprs]- + 10+ [A-Za-z0-9-])."
+    },
+    {
+      "id": "env-npmrc-authtoken",
+      "category": "env-lines",
+      "mode": "scrub",
+      "input": "//npm.pkg.github.com/:_authToken=ghp_ZyXwVuTsRqPoNmLkJiHgFeDcBa9876543210",
+      "planted": [
+        {
+          "type": "github_token",
+          "value": "ghp_ZyXwVuTsRqPoNmLkJiHgFeDcBa9876543210"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "comment-fixture-ssn",
+      "category": "code-comments",
+      "mode": "scrub",
+      "input": "// TODO(qa): replace fixture SSN 078-05-1120 before we ship",
+      "planted": [
+        {
+          "type": "ssn",
+          "value": "078-05-1120"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "comment-staging-card-spaced",
+      "category": "code-comments",
+      "mode": "scrub",
+      "input": "# staging card on file: 4242 4242 4242 4242 (see vault)",
+      "planted": [
+        {
+          "type": "credit_card",
+          "value": "4242 4242 4242 4242"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "comment-owner-email",
+      "category": "code-comments",
+      "mode": "scrub",
+      "input": "/* ping carol.smith@corp.example.com before deleting this shim */",
+      "planted": [
+        {
+          "type": "email",
+          "value": "carol.smith@corp.example.com"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "comment-rotated-anthropic-key",
+      "category": "code-comments",
+      "mode": "scrub",
+      "input": "// rotated 2026-07-01; old key sk-ant-api03-Xy12AbCd34EfGh56IjKl no longer valid",
+      "planted": [
+        {
+          "type": "api_key",
+          "value": "sk-ant-api03-Xy12AbCd34EfGh56IjKl"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "comment-dba-phone",
+      "category": "code-comments",
+      "mode": "scrub",
+      "input": "# escalation: call the DBA at (415) 555-0107",
+      "planted": [
+        {
+          "type": "phone",
+          "value": "(415) 555-0107"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "comment-seeded-dob",
+      "category": "code-comments",
+      "mode": "scrub",
+      "input": "// user record seeded with DOB 12/31/1979 for the age-gate test",
+      "planted": [
+        {
+          "type": "dob",
+          "value": "12/31/1979"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "json-ssn-field",
+      "category": "json-blobs",
+      "mode": "scrub",
+      "input": "{\"user\":{\"name\":\"redacted\",\"ssn\":\"078-05-1120\"}}",
+      "planted": [
+        {
+          "type": "ssn",
+          "value": "078-05-1120"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "json-card-field",
+      "category": "json-blobs",
+      "mode": "scrub",
+      "input": "{\"payment\":{\"card_number\":\"4111111111111111\",\"cvv\":\"123\"}}",
+      "planted": [
+        {
+          "type": "credit_card",
+          "value": "4111111111111111"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "json-quoted-password",
+      "category": "json-blobs",
+      "mode": "scrub",
+      "input": "{\"username\":\"svc-deploy\",\"password\":\"CorrectHorse9Battery\"}",
+      "planted": [
+        {
+          "type": "secret_assignment",
+          "value": "CorrectHorse9Battery"
+        }
+      ],
+      "expected": "miss",
+      "notes": "JSON-quoted keys defeat SECRET_ASSIGNMENT: the closing quote after the keyword ('\"password\":') breaks the \\b\\s*[=:] bridge, so the value survives scrub(). Fix = allow ['\\\"]?\\s*[=:] between keyword and value."
+    },
+    {
+      "id": "json-bearer-header",
+      "category": "json-blobs",
+      "mode": "scrub",
+      "input": "{\"headers\":{\"Authorization\":\"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0In0.abc123def456ghi789\"}}",
+      "planted": [
+        {
+          "type": "jwt",
+          "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0In0.abc123def456ghi789"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "json-email-array",
+      "category": "json-blobs",
+      "mode": "scrub",
+      "input": "{\"reviewers\":[\"dana.kim@corp.example.com\",\"lee.wong@corp.example.com\"]}",
+      "planted": [
+        {
+          "type": "email",
+          "value": "dana.kim@corp.example.com"
+        },
+        {
+          "type": "email",
+          "value": "lee.wong@corp.example.com"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "json-phone-field",
+      "category": "json-blobs",
+      "mode": "scrub",
+      "input": "{\"contact\":{\"mobile\":\"415-555-0163\"}}",
+      "planted": [
+        {
+          "type": "phone",
+          "value": "415-555-0163"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "table-team-email",
+      "category": "markdown-tables",
+      "mode": "scrub",
+      "input": "| Owner | Contact |\n|---|---|\n| Payments | pay-team@corp.example.com |",
+      "planted": [
+        {
+          "type": "email",
+          "value": "pay-team@corp.example.com"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "table-sample-ssn",
+      "category": "markdown-tables",
+      "mode": "scrub",
+      "input": "| Field | Sample |\n|---|---|\n| SSN | 078-05-1120 |",
+      "planted": [
+        {
+          "type": "ssn",
+          "value": "078-05-1120"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "table-test-card",
+      "category": "markdown-tables",
+      "mode": "scrub",
+      "input": "| Test card | 4111-1111-1111-1111 | any CVV |",
+      "planted": [
+        {
+          "type": "credit_card",
+          "value": "4111-1111-1111-1111"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "table-account-split-cell",
+      "category": "markdown-tables",
+      "mode": "scrub",
+      "input": "| account | 021000021 |\n| branch | downtown |",
+      "planted": [
+        {
+          "type": "routing",
+          "value": "021000021"
+        }
+      ],
+      "expected": "miss",
+      "notes": "The table pipe between the 'account' keyword cell and the number cell is not in ROUTING_OR_ACCOUNT_NUMBER's [\\s:#]* bridge, so the keyword anchor never fires; the bare 9-digit run is detectOnly by design, so scrub() leaves it. containsPii(high) still flags the text via us-ssn-no-separator. Fix = tolerate a pipe/cell boundary in the keyword bridge."
+    },
+    {
+      "id": "table-oncall-phone",
+      "category": "markdown-tables",
+      "mode": "scrub",
+      "input": "| On-call | (415) 555-0119 |",
+      "planted": [
+        {
+          "type": "phone",
+          "value": "(415) 555-0119"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "homoglyph-email-cyrillic-local",
+      "category": "unicode-homoglyph",
+      "mode": "scrub",
+      "input": "contact jоhn.dоe@corp.example.com now",
+      "planted": [
+        {
+          "type": "email",
+          "value": "jоhn.dоe@corp.example.com"
+        }
+      ],
+      "mustNotSurvive": [
+        "jоhn.dо"
+      ],
+      "expected": "caught",
+      "notes": "Local part contains Cyrillic о (U+043E). Fixed 2026-07-13: EMAIL is unicode-aware (\\p{L}\\p{N})."
+    },
+    {
+      "id": "fullwidth-digits-ssn",
+      "category": "unicode-homoglyph",
+      "mode": "scrub",
+      "input": "SSN ０７８－０５－１１２０ on file",
+      "planted": [
+        {
+          "type": "ssn",
+          "value": "０７８－０５－１１２０"
+        }
+      ],
+      "expected": "miss",
+      "notes": "Fullwidth digits (U+FF10-FF19) and fullwidth hyphen are not \\d / [- ], so US_SSN never fires and containsPii stays quiet. Fix = NFKC-normalize input before matching, or extend digit classes."
+    },
+    {
+      "id": "zwsp-inside-card",
+      "category": "unicode-homoglyph",
+      "mode": "scrub",
+      "input": "card 4111​1111​1111​1111 saved",
+      "planted": [
+        {
+          "type": "credit_card",
+          "value": "4111​1111​1111​1111"
+        }
+      ],
+      "expected": "miss",
+      "notes": "Zero-width spaces (U+200B) between digit groups are not in CREDIT_CARD_LIKE's [ .-] separator class, and each visible 4-digit group is too short to match alone. Fix = strip format/zero-width characters before matching."
+    },
+    {
+      "id": "nbsp-separated-card",
+      "category": "unicode-homoglyph",
+      "mode": "scrub",
+      "input": "card 4111 1111 1111 1111 on file",
+      "planted": [
+        {
+          "type": "credit_card",
+          "value": "4111 1111 1111 1111"
+        }
+      ],
+      "expected": "miss",
+      "notes": "NBSP (U+00A0) is not the ASCII space in CREDIT_CARD_LIKE's separator class. Pasted card numbers from rendered HTML frequently carry NBSPs. Fix = include \\u00a0 (or normalize) in the separator class."
+    },
+    {
+      "id": "cyrillic-domain-email",
+      "category": "unicode-homoglyph",
+      "mode": "scrub",
+      "input": "write to admin@корп.example.com for access",
+      "planted": [
+        {
+          "type": "email",
+          "value": "admin@корп.example.com"
+        }
+      ],
+      "mustNotSurvive": [
+        "admin@"
+      ],
+      "expected": "miss",
+      "notes": "EMAIL's domain part is ASCII \\w only, so a Cyrillic domain label kills the whole match and the address survives. The 2026-07-13 unicode fix covered the LOCAL part only. Fix = unicode-aware domain labels (\\p{L}\\p{N})."
+    },
+    {
+      "id": "homoglyph-inside-api-key",
+      "category": "unicode-homoglyph",
+      "mode": "scrub",
+      "input": "auth via sk-ant-api03-АbCdEf123456789012345 failed",
+      "planted": [
+        {
+          "type": "api_key",
+          "value": "sk-ant-api03-АbCdEf123456789012345"
+        }
+      ],
+      "mustNotSurvive": [
+        "bCdEf123456789012345"
+      ],
+      "expected": "miss",
+      "notes": "A single Cyrillic А (U+0410) inside the key body splits the [A-Za-z0-9_-] run below the 16-char minimum, so both the Anthropic and generic key patterns miss. An exfiltrator can smuggle a key past the firewall with one homoglyph. Fix = confusable-normalize before matching."
+    },
+    {
+      "id": "card-split-across-newline",
+      "category": "split-across-lines",
+      "mode": "scrub",
+      "input": "card:\n4111 1111\n1111 1111\nexp 11/29",
+      "planted": [
+        {
+          "type": "credit_card",
+          "value": "4111 1111\n1111 1111"
+        }
+      ],
+      "expected": "miss",
+      "notes": "A newline inside the digit run is not in CREDIT_CARD_LIKE's [ .-] class and each half is only 8 digits. Wrapped card numbers (email clients hard-wrap at ~72 cols) leak. Fix = allow \\s (incl. newline) as separator or pre-join wrapped digit runs."
+    },
+    {
+      "id": "ssn-split-across-newline",
+      "category": "split-across-lines",
+      "mode": "scrub",
+      "input": "SSN 078-05-\n1120 per HR",
+      "planted": [
+        {
+          "type": "ssn",
+          "value": "078-05-\n1120"
+        }
+      ],
+      "mustNotSurvive": [
+        "078-05-"
+      ],
+      "expected": "miss",
+      "notes": "US_SSN's separators are [- ] without newline, so a line-wrapped SSN survives (both halves too short to match alone). Fix = \\s-tolerant separators."
+    },
+    {
+      "id": "email-split-across-newline",
+      "category": "split-across-lines",
+      "mode": "scrub",
+      "input": "mail me at jane.doe@\ncorp.example.com",
+      "planted": [
+        {
+          "type": "email",
+          "value": "jane.doe@\ncorp.example.com"
+        }
+      ],
+      "mustNotSurvive": [
+        "jane.doe"
+      ],
+      "expected": "miss",
+      "notes": "EMAIL requires local@domain contiguous; a wrap after the @ leaves the identifying local part 'jane.doe@' in the clear (FQDN separately eats the domain line). Same regex-layer limit as the B7 'email-spaced-obfuscated' parity fixture. Fix = normalization pass before matching."
+    },
+    {
+      "id": "pem-unterminated-chunk",
+      "category": "split-across-lines",
+      "mode": "scrub",
+      "input": "log tail: -----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEA",
+      "planted": [
+        {
+          "type": "private_key",
+          "value": "MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEA"
+        }
+      ],
+      "expected": "caught",
+      "notes": "PEM_KEY_UNTERMINATED covers a key split at a capture/chunk boundary (2026-07-13 fix)."
+    },
+    {
+      "id": "jwt-split-across-newline",
+      "category": "split-across-lines",
+      "mode": "scrub",
+      "input": "token=eyJhbGciOiJIUzI1NiJ9.\neyJzdWIiOiIxMjM0NTY3ODkwIn0.abc123def456",
+      "planted": [
+        {
+          "type": "jwt",
+          "value": "eyJhbGciOiJIUzI1NiJ9.\neyJzdWIiOiIxMjM0NTY3ODkwIn0.abc123def456"
+        }
+      ],
+      "mustNotSurvive": [
+        "eyJzdWIi"
+      ],
+      "expected": "miss",
+      "notes": "JWT requires the three segments contiguous; a wrap after a dot leaks both payload segments. Bare 'token=' is not in SECRET_ASSIGNMENT's keyword list either. Fix = join-wrapped-token normalization, or add bare 'token' to the assignment keywords (false-positive tradeoff)."
+    },
+    {
+      "id": "card-single-spaces",
+      "category": "mixed-separators",
+      "mode": "scrub",
+      "input": "card 4111 1111 1111 1111 on file",
+      "planted": [
+        {
+          "type": "credit_card",
+          "value": "4111 1111 1111 1111"
+        }
+      ],
+      "expected": "caught",
+      "notes": "Space-separated cards were an audit-flagged gap; separator tolerance landed 2026-07-13 (v1.1.0). This fixture keeps it from regressing."
+    },
+    {
+      "id": "card-dotted",
+      "category": "mixed-separators",
+      "mode": "scrub",
+      "input": "card 4111.1111.1111.1111 on file",
+      "planted": [
+        {
+          "type": "credit_card",
+          "value": "4111.1111.1111.1111"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "card-mixed-separators",
+      "category": "mixed-separators",
+      "mode": "scrub",
+      "input": "card 4111-1111 1111.1111 flagged by risk",
+      "planted": [
+        {
+          "type": "credit_card",
+          "value": "4111-1111 1111.1111"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "card-double-space",
+      "category": "mixed-separators",
+      "mode": "scrub",
+      "input": "card 4111  1111  1111  1111 manual entry",
+      "planted": [
+        {
+          "type": "credit_card",
+          "value": "4111  1111  1111  1111"
+        }
+      ],
+      "expected": "miss",
+      "notes": "CREDIT_CARD_LIKE allows at most ONE separator between digits ([ .-]?); double spaces (common after copy-paste from PDFs) break the run into 4-digit groups. Fix = [ .-]{0,2} or whitespace-collapse normalization."
+    },
+    {
+      "id": "phone-parens-no-space",
+      "category": "mixed-separators",
+      "mode": "scrub",
+      "input": "call (415)555-0107 now",
+      "planted": [
+        {
+          "type": "phone",
+          "value": "(415)555-0107"
+        }
+      ],
+      "expected": "miss",
+      "notes": "US_PHONE requires a separator after the area code ([-.\\s]), so the very common '(415)555-0107' form (no space after the paren) misses entirely. Fix = make the post-area-code separator optional when parens are present."
+    },
+    {
+      "id": "phone-dotted",
+      "category": "mixed-separators",
+      "mode": "scrub",
+      "input": "fax 415.555.0142 attn billing",
+      "planted": [
+        {
+          "type": "phone",
+          "value": "415.555.0142"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "phone-uk-grouping",
+      "category": "intl-formats",
+      "mode": "scrub",
+      "input": "London office +44 20 7946 0958 ext 12",
+      "planted": [
+        {
+          "type": "phone",
+          "value": "+44 20 7946 0958"
+        }
+      ],
+      "expected": "miss",
+      "notes": "US_PHONE is US-centric by design (3-3-4 grouping, optional +1). Non-US groupings leak. Same documented gap as B7 'phone-intl-uk'. Fix = intl phone pattern (or libphonenumber-style normalization) — a deliberate scope decision, not a regex tweak."
+    },
+    {
+      "id": "phone-e164-no-separator",
+      "category": "intl-formats",
+      "mode": "scrub",
+      "input": "dial +14155550142 for support",
+      "planted": [
+        {
+          "type": "phone",
+          "value": "+14155550142"
+        }
+      ],
+      "expected": "miss",
+      "notes": "E.164 with no separators misses: US_PHONE requires at least one [-.\\s] separator, and an 11-digit run is neither card-length nor a bare-9 detect hit. Machine-formatted phone numbers (vCards, APIs, WhatsApp exports) are exactly this shape. Fix = optional-separator variant anchored on the + prefix."
+    },
+    {
+      "id": "iban-spaced",
+      "category": "intl-formats",
+      "mode": "scrub",
+      "input": "IBAN DE89 3704 0044 0532 0130 00 for invoices",
+      "planted": [
+        {
+          "type": "iban",
+          "value": "DE89 3704 0044 0532 0130 00"
+        }
+      ],
+      "mustNotSurvive": [
+        "3704 0044 0532"
+      ],
+      "expected": "caught",
+      "notes": "No IBAN pattern exists; the digit tail happens to fall inside CREDIT_CARD_LIKE's 13-19 digit window, so the identifying account digits are over-redacted as <CC>. Caught-by-accident — a dedicated IBAN pattern would be more precise."
+    },
+    {
+      "id": "uk-nino",
+      "category": "intl-formats",
+      "mode": "scrub",
+      "input": "NI number QQ123456C on the P60",
+      "planted": [
+        {
+          "type": "national_id",
+          "value": "QQ123456C"
+        }
+      ],
+      "expected": "miss",
+      "notes": "Non-US national ids (UK NINO here) have no pattern — same documented gap as B7's national_id fixtures. Fix = keyword-anchored national-id patterns per format."
+    },
+    {
+      "id": "passport-keyword-intl",
+      "category": "intl-formats",
+      "mode": "scrub",
+      "input": "Passport No: L898902C3 (PRC)",
+      "planted": [
+        {
+          "type": "passport",
+          "value": "L898902C3"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "dob-eu-dotted",
+      "category": "intl-formats",
+      "mode": "scrub",
+      "input": "geboren am 31.12.1979 in Berlin",
+      "planted": [
+        {
+          "type": "dob",
+          "value": "31.12.1979"
+        }
+      ],
+      "expected": "miss",
+      "notes": "FULL_DOB accepts [/-] separators only; the dotted European date form (31.12.1979) leaks. Fix = add '.' to the separator class (ISO year-first dates still excluded)."
+    },
+    {
+      "id": "curl-bearer-header",
+      "category": "credentials-in-context",
+      "mode": "scrub",
+      "input": "curl -H 'Authorization: Bearer eyJhbGciOiJSUzI1NiJ9.eyJvcmciOiJhY21lIn0.q1w2e3r4t5y6' https://api.internal.acme.com/v1/users",
+      "planted": [
+        {
+          "type": "bearer_token",
+          "value": "eyJhbGciOiJSUzI1NiJ9.eyJvcmciOiJhY21lIn0.q1w2e3r4t5y6"
+        },
+        {
+          "type": "hostname",
+          "value": "api.internal.acme.com"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "localstorage-jwt",
+      "category": "credentials-in-context",
+      "mode": "scrub",
+      "input": "localStorage.setItem('session', 'eyJhbGciOiJIUzI1NiJ9.eyJ1aWQiOjQyfQ.YWJjZGVmZ2hpamtsbW5vcA')",
+      "planted": [
+        {
+          "type": "jwt",
+          "value": "eyJhbGciOiJIUzI1NiJ9.eyJ1aWQiOjQyfQ.YWJjZGVmZ2hpamtsbW5vcA"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "git-remote-oauth-token",
+      "category": "credentials-in-context",
+      "mode": "scrub",
+      "input": "origin https://oauth2:gho_AbCdEfGhIjKlMnOpQrStUvWxYz0123456789@github.com/acme/api.git (push)",
+      "planted": [
+        {
+          "type": "github_token",
+          "value": "gho_AbCdEfGhIjKlMnOpQrStUvWxYz0123456789"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "yaml-bare-secret-access-key",
+      "category": "credentials-in-context",
+      "mode": "scrub",
+      "input": "aws:\n  access_key_id: AKIAIOSFODNN7EXAMPLE\n  secret_access_key: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+      "planted": [
+        {
+          "type": "aws_secret",
+          "value": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+        }
+      ],
+      "expected": "miss",
+      "notes": "The YAML short form 'secret_access_key:' (no aws_ prefix) matches neither AWS_SECRET_ACCESS_KEY (exact keyword) nor SECRET_ASSIGNMENT ('secret' inside secret_access_key has no trailing \\b). The 40-char secret VALUE survives; the AKIA id on the line above is caught. Fix = add secret[_-]access[_-]key to the assignment keywords."
+    },
+    {
+      "id": "log-slack-token",
+      "category": "credentials-in-context",
+      "mode": "scrub",
+      "input": "2026-07-12T08:14:02Z WARN retry with token xoxp-NOTAREALTOKEN-abcDEFghiJKL",
+      "planted": [
+        {
+          "type": "slack_token",
+          "value": "xoxp-NOTAREALTOKEN-abcDEFghiJKL"
+        }
+      ],
+      "expected": "caught",
+      "notes": "Letters-only body to stay clear of GitHub secret scanning; shape still exercises the slack-token pattern."
+    },
+    {
+      "id": "stacktrace-key-and-path",
+      "category": "credentials-in-context",
+      "mode": "scrub",
+      "input": "AuthenticationError: invalid x-api-key sk-ant-api03-XyZ123AbC456DeF789GhI at Object.request (/Users/alexr/dev/app/api.js:88)",
+      "planted": [
+        {
+          "type": "api_key",
+          "value": "sk-ant-api03-XyZ123AbC456DeF789GhI"
+        },
+        {
+          "type": "path",
+          "value": "/Users/alexr"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "cli-inline-password-flag",
+      "category": "credentials-in-context",
+      "mode": "scrub",
+      "input": "mysql -u root -pS3cretDbPass9 -h db.internal.acme.com",
+      "planted": [
+        {
+          "type": "password",
+          "value": "S3cretDbPass9"
+        }
+      ],
+      "expected": "miss",
+      "notes": "MySQL-style inline password (-pVALUE, no space, no '=') has no keyword bridge for SECRET_ASSIGNMENT and no prefix for the key patterns. The -u username IS caught (CLI_USERNAME_FLAG); the password survives. Fix = a -p<value> lookbehind pattern scoped to known CLI shapes."
+    },
+    {
+      "id": "ssn-dashed-prose",
+      "category": "gov-financial",
+      "mode": "scrub",
+      "input": "Her SSN is 078-05-1120 per the I-9.",
+      "planted": [
+        {
+          "type": "ssn",
+          "value": "078-05-1120"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "ssn-space-separated",
+      "category": "gov-financial",
+      "mode": "scrub",
+      "input": "SSN 078 05 1120 per HR",
+      "planted": [
+        {
+          "type": "ssn",
+          "value": "078 05 1120"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "dob-slash",
+      "category": "gov-financial",
+      "mode": "scrub",
+      "input": "DOB 04/12/1988 (verified)",
+      "planted": [
+        {
+          "type": "dob",
+          "value": "04/12/1988"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "dob-dash",
+      "category": "gov-financial",
+      "mode": "scrub",
+      "input": "born 4-12-1988 in Ohio",
+      "planted": [
+        {
+          "type": "dob",
+          "value": "4-12-1988"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "routing-keyword-wrapped",
+      "category": "gov-financial",
+      "mode": "scrub",
+      "input": "routing\nnumber: 021000021",
+      "planted": [
+        {
+          "type": "routing",
+          "value": "021000021"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "account-hash-prefix",
+      "category": "gov-financial",
+      "mode": "scrub",
+      "input": "wire to account #4453901188221 today",
+      "planted": [
+        {
+          "type": "account",
+          "value": "4453901188221"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "bare-ssn-detect-prose",
+      "category": "ssn-bare-9digit",
+      "mode": "detect",
+      "input": "ssn is 078051120",
+      "planted": [
+        {
+          "type": "ssn",
+          "value": "078051120"
+        }
+      ],
+      "expected": "caught",
+      "notes": "detectOnly path: containsPii(high) must flag a bare 9-digit run even though scrub() never rewrites it."
+    },
+    {
+      "id": "bare-ssn-detect-json",
+      "category": "ssn-bare-9digit",
+      "mode": "detect",
+      "input": "{\"ssn\":\"078051120\"}",
+      "planted": [
+        {
+          "type": "ssn",
+          "value": "078051120"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "bare-ssn-detect-label",
+      "category": "ssn-bare-9digit",
+      "mode": "detect",
+      "input": "SSN: 078051120",
+      "planted": [
+        {
+          "type": "ssn",
+          "value": "078051120"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "bare-ssn-scrub-by-design",
+      "category": "ssn-bare-9digit",
+      "mode": "scrub",
+      "input": "SSN: 078051120",
+      "planted": [
+        {
+          "type": "ssn",
+          "value": "078051120"
+        }
+      ],
+      "expected": "miss",
+      "notes": "PERMANENT by-design xfail, not a bug: a separator-less 9-digit run is indistinguishable from order ids / build numbers, so us-ssn-no-separator is detectOnly and scrub() must NOT rewrite it (masking a build number as <SSN> on an egress path is worse). If this ever flips to caught, someone made the pattern rewrite text — that is a regression, not a fix."
+    },
+    {
+      "id": "semantic-employer",
+      "category": "semantic-taxonomy",
+      "mode": "semantic",
+      "input": "Led the payments migration at Goldman Sachs with a team of six",
+      "planted": [
+        {
+          "type": "company",
+          "value": "Goldman Sachs"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "semantic-tools-lowercase",
+      "category": "semantic-taxonomy",
+      "mode": "semantic",
+      "input": "deployed via kubernetes and terraform nightly",
+      "planted": [
+        {
+          "type": "tool",
+          "value": "kubernetes"
+        },
+        {
+          "type": "tool",
+          "value": "terraform"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "semantic-multiword-tool",
+      "category": "semantic-taxonomy",
+      "mode": "semantic",
+      "input": "paired in VS Code on the parser rewrite",
+      "planted": [
+        {
+          "type": "tool",
+          "value": "VS Code"
+        }
+      ],
+      "expected": "caught"
+    },
+    {
+      "id": "semantic-punctuation-adjacent",
+      "category": "semantic-taxonomy",
+      "mode": "semantic",
+      "input": "Migrated Stripe, then Plaid, integrations to the new ledger.",
+      "planted": [
+        {
+          "type": "company",
+          "value": "Stripe"
+        },
+        {
+          "type": "company",
+          "value": "Plaid"
+        }
+      ],
+      "expected": "caught"
+    }
+  ]
+}

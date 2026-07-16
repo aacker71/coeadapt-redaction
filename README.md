@@ -42,6 +42,24 @@ const { redacted } = scrub(text, { minSeverity: "high" });        // critical+hi
 const { redacted: safe } = scrubSemantic(scrub(text).redacted);
 ```
 
+## Recall measurement (B8 adversarial corpus)
+
+`eval/recall-corpus.json` — 80 fixtures of PII hidden in the shapes real repos
+produce (README badges, commit messages, `.env` lines, JSON blobs, markdown
+tables, unicode confusables, line-wrapped values, international formats).
+`test/recall-gate.test.ts` runs it against this library and **ratchets
+per-category recall** against the committed `eval/recall-baseline.json`:
+
+- `expected: "caught"` fixtures must stay caught (regression = test failure).
+- `expected: "miss"` fixtures are xfail-style documentation of known gaps: the
+  gate asserts they *still* miss, so a pattern fix flips them visibly — promote
+  the fixture and regenerate the baseline (`npm run recall:baseline`).
+
+This is distinct from the B7 **parity** corpus
+(`career-box-dev/evals/redaction-parity/`, 75 fixtures): parity asks "do the TS
+and Python implementations agree", the recall gate asks "does the library catch
+it at all". Never delete or weaken a fixture to make the suite pass.
+
 ## Consuming repos
 
 Both repos need an `.npmrc` mapping the scope to GitHub Packages and a
